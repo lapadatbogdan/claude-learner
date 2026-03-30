@@ -93,47 +93,100 @@ The argument is hours to look back (168 = 7 days). This will:
 - Automatically create memories/skills/patterns from findings
 - Print what it found and applied
 
-### Step 6: Set up the cron (macOS)
+### Step 6: Set up scheduled runs
 
-Edit the plist template with your username:
+Pick your platform:
+
+<details>
+<summary><strong>macOS (launchd)</strong></summary>
+
+Edit the plist template with your username and install it:
 
 ```bash
 sed "s/YOUR_USERNAME/$(whoami)/g" ~/tools/claude-learner/com.claude.learner.plist > ~/Library/LaunchAgents/com.claude.learner.plist
-```
-
-Load it:
-
-```bash
 launchctl load ~/Library/LaunchAgents/com.claude.learner.plist
 ```
 
-Verify it's running:
+Verify:
 
 ```bash
 launchctl list | grep claude.learner
 ```
 
-The cron runs every 4 hours and analyzes the last 6 hours of sessions.
+To uninstall:
 
-### Step 6 (alternative): Linux with crontab
+```bash
+launchctl unload ~/Library/LaunchAgents/com.claude.learner.plist
+rm ~/Library/LaunchAgents/com.claude.learner.plist
+```
+
+</details>
+
+<details>
+<summary><strong>Linux (crontab)</strong></summary>
 
 ```bash
 crontab -e
-# Add this line:
+```
+
+Add this line:
+
+```
 0 */4 * * * cd ~/tools/claude-learner && python3 analyzer.py 6 >> /tmp/claude-learner.log 2>&1
 ```
 
-### Uninstall
+Verify:
 
 ```bash
-# Stop cron
-launchctl unload ~/Library/LaunchAgents/com.claude.learner.plist
-rm ~/Library/LaunchAgents/com.claude.learner.plist
+crontab -l | grep claude-learner
+```
 
-# Remove skills
+To uninstall:
+
+```bash
+crontab -e
+# Remove the claude-learner line
+```
+
+</details>
+
+<details>
+<summary><strong>Windows (Task Scheduler)</strong></summary>
+
+Open PowerShell as Administrator:
+
+```powershell
+$action = New-ScheduledTaskAction -Execute "python3" -Argument "analyzer.py 6" -WorkingDirectory "$env:USERPROFILE\tools\claude-learner"
+$trigger = New-ScheduledTaskTrigger -RepetitionInterval (New-TimeSpan -Hours 4) -Once -At (Get-Date)
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd
+Register-ScheduledTask -TaskName "ClaudeLearner" -Action $action -Trigger $trigger -Settings $settings -Description "Claude Code self-learning loop"
+```
+
+Verify:
+
+```powershell
+Get-ScheduledTask -TaskName "ClaudeLearner"
+```
+
+To uninstall:
+
+```powershell
+Unregister-ScheduledTask -TaskName "ClaudeLearner" -Confirm:$false
+```
+
+Note: On Windows, Claude Code sessions are stored in `%USERPROFILE%\.claude\projects\`. The indexer handles Windows paths automatically.
+
+</details>
+
+The scheduled task runs every 4 hours and analyzes the last 6 hours of sessions.
+
+### Uninstall
+
+1. Remove the scheduled task (see platform-specific instructions above)
+2. Remove skills and learner:
+
+```bash
 rm -rf ~/.claude/skills/recall ~/.claude/skills/learn
-
-# Remove learner
 rm -rf ~/tools/claude-learner
 ```
 
