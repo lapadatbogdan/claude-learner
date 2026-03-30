@@ -267,6 +267,31 @@ The indexer reads these files and builds a SQLite database with FTS5 full-text s
 | `pattern` | Saved as feedback memory |
 | `improvement` | Patches existing skill or memory file |
 
+## How it compares
+
+Most existing tools solve one piece of the self-learning puzzle. Claude Learner is the first to combine all of them into a single automated pipeline on top of Claude Code.
+
+| Feature | Claude Learner | Claudeception | claude-reflect | Letta | Copilot Memory | Mem0 |
+|---|---|---|---|---|---|---|
+| Session indexing + search | FTS5 | - | - | - | - | - |
+| Automated background analysis | Cron every 4h | Manual/hook | Manual | Platform | Built-in | - |
+| Cross-session LLM analysis | claude -p | - | - | Yes | Unclear | - |
+| Auto skill creation | Yes | Yes | Partial | Yes | - | - |
+| Auto skill improvement | Yes | - | Partial | Yes | - | - |
+| Memory/pattern extraction | Yes | - | Corrections only | Yes | Repo facts | General |
+| Session recall (/recall) | Yes | - | - | - | - | - |
+| Zero manual intervention | Yes | - | - | Yes | Yes | - |
+| Lightweight (no platform) | Yes | Yes | Yes | - | - | - |
+| Works with Claude Code natively | Yes | Yes | Yes | Own platform | Own platform | Any |
+
+### Related projects
+
+- [Claudeception](https://github.com/blader/Claudeception) - skill extraction from Claude Code sessions (manual trigger)
+- [claude-reflect](https://github.com/BayramAnnakov/claude-reflect) - capture corrections and preferences during sessions
+- [Letta](https://github.com/letta-ai/letta) - stateful agent platform with skill learning research
+- [Mem0](https://github.com/mem0ai/mem0) - universal memory layer for AI agents
+- [Hermes Agent](https://github.com/NousResearch/hermes-agent) - self-improving agent framework (inspiration for this project)
+
 ## Cost
 
 Using Claude Code subscription (not API):
