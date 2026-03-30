@@ -31,7 +31,21 @@ Apply findings:
   - improvement --> patch existing skill/memory
 ```
 
-## Installation
+## Quick install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lapadatbogdan/claude-learner/main/install.sh | bash
+```
+
+This will clone the repo, install skills, index your sessions, and set up the cron job automatically. Works on macOS and Linux. Windows prints PowerShell instructions.
+
+To uninstall:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lapadatbogdan/claude-learner/main/uninstall.sh | bash
+```
+
+## Manual installation
 
 ### Prerequisites
 
