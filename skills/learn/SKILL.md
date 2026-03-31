@@ -7,6 +7,10 @@ description: Review pending learning candidates and approve/skip/delete. Trigger
 
 Review candidates detected by the background learner and decide which to apply.
 
+## Parameters
+
+If the invocation includes `--auto` or `auto-accept`, set **auto_accept = true**. In auto-accept mode, all candidates are approved without prompting.
+
 ## Step 1: Load pending candidates
 
 ```bash
@@ -15,7 +19,7 @@ cat ~/tools/claude-learner/pending_learnings.json 2>/dev/null || echo "[]"
 
 If the result is `[]` or the file was missing, respond with: "Nothing pending." and stop.
 
-## Step 2: For each candidate, display summary and ask [a]pprove / [s]kip / [d]elete
+## Step 2: For each candidate, display summary and collect decision
 
 For each candidate, display a human-readable summary based on its `type` field:
 
@@ -44,11 +48,12 @@ For each candidate, display a human-readable summary based on its `type` field:
   Fix: <fix>
   ```
 
-After displaying the summary, ask:
+**If auto_accept = true:** Add the candidate to the approved list immediately without asking. Display the summary anyway so the user can see what was applied.
+
+**If auto_accept = false:** After displaying the summary, ask:
 ```
 [a]pprove / [s]kip / [d]elete?
 ```
-
 Wait for the user's response before moving to the next candidate. Collect decisions:
 - `a` or `approve` → approved list
 - `s` or `skip` → skipped list
