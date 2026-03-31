@@ -38,11 +38,11 @@ fi
 info "Python $PY_VERSION found"
 
 # Check Claude auth
-if claude -p "echo ok" >/dev/null 2>&1; then
+if claude auth status >/dev/null 2>&1; then
     info "Claude Code auth working"
 else
     warn "Claude Code auth not configured for background use"
-    echo "    Run 'claude setup-token' after installation to enable the cron job"
+    echo "    Run 'claude' and complete auth setup to enable the cron job"
 fi
 
 # Clone or update
@@ -77,7 +77,7 @@ case "$OS" in
         ;;
     Linux)
         info "Detected Linux - setting up crontab..."
-        CRON_LINE="0 */4 * * * cd $INSTALL_DIR && python3 analyzer.py 6 >> /tmp/claude-learner.log 2>&1"
+        CRON_LINE="0 */4 * * * PATH=/usr/local/bin:/usr/bin:/bin HOME=$HOME bash $INSTALL_DIR/run-learner.sh"
         (crontab -l 2>/dev/null | grep -v "claude-learner"; echo "$CRON_LINE") | crontab -
         info "Cron installed (every 4 hours)"
         ;;
