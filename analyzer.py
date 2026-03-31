@@ -568,5 +568,18 @@ def run(hours=24):
 
 
 if __name__ == "__main__":
-    hours = int(sys.argv[1]) if len(sys.argv) > 1 else 24
-    run(hours=hours)
+    if len(sys.argv) > 1 and sys.argv[1] == "--apply-json":
+        if len(sys.argv) < 3:
+            print("Usage: analyzer.py --apply-json '<json_string>'")
+            sys.exit(1)
+        try:
+            candidate = json.loads(sys.argv[2])
+        except json.JSONDecodeError as e:
+            print(f"Invalid JSON argument: {e}")
+            sys.exit(1)
+        applied = apply_findings([candidate])
+        print(f"Applied: {applied}")
+        sys.exit(0 if sum(applied.values()) > 0 else 1)
+    else:
+        hours = int(sys.argv[1]) if len(sys.argv) > 1 else 24
+        run(hours=hours)
