@@ -19,6 +19,8 @@ from indexer import index_all, get_stats
 from search import recent_sessions, get_session_transcript
 
 LEARNER_DIR = Path.home() / "tools" / "claude-learner"
+PENDING_FILE = LEARNER_DIR / "pending_learnings.json"
+
 def _find_memory_dir():
     """Find the memory directory for the current user's default project."""
     projects_dir = Path.home() / ".claude" / "projects"
@@ -45,7 +47,7 @@ def load_state():
     if STATE_FILE.exists():
         with open(STATE_FILE) as f:
             return json.load(f)
-    return {"last_run": None, "analyzed_sessions": []}
+    return {"last_run": None}
 
 
 def save_state(state):
@@ -244,6 +246,7 @@ type: {category}
 
 {body}
 """
+    filepath.parent.mkdir(parents=True, exist_ok=True)
     with open(filepath, "w") as f:
         f.write(memory_content)
 
@@ -271,12 +274,13 @@ def apply_skill_proposal(finding):
     if not name:
         return None
 
-    skill_dir = Path.home() / ".claude" / "skills" / name
+    safe_name = slugify(name)
+    skill_dir = Path.home() / ".claude" / "skills" / safe_name
     skill_file = skill_dir / "SKILL.md"
 
     # Don't overwrite existing skills
     if skill_file.exists():
-        print(f"  Skill already exists: {name}, skipping")
+        print(f"  Skill already exists: {safe_name}, skipping")
         return None
 
     description = finding.get("description", "")
@@ -286,11 +290,11 @@ def apply_skill_proposal(finding):
     steps_md = "\n".join(f"{i+1}. {step}" for i, step in enumerate(steps))
 
     skill_content = f"""---
-name: {name}
-description: {description}. Triggers on "/{name}" or related keywords.
+name: {safe_name}
+description: {description}. Triggers on "/{safe_name}" or related keywords.
 ---
 
-# {name}
+# {safe_name}
 
 {description}
 
@@ -304,8 +308,8 @@ description: {description}. Triggers on "/{name}" or related keywords.
     with open(skill_file, "w") as f:
         f.write(skill_content)
 
-    print(f"  Created skill: {name}")
-    return name
+    print(f"  Created skill: {safe_name}")
+    return safe_name
 
 
 def apply_pattern(finding):
@@ -332,6 +336,7 @@ type: feedback
 
 **How to apply:** {recommendation}
 """
+    filepath.parent.mkdir(parents=True, exist_ok=True)
     with open(filepath, "w") as f:
         f.write(memory_content)
 
@@ -459,6 +464,7 @@ def apply_findings(findings):
     return applied
 
 
+# Used by the manual /learn skill path (not called from the cron run() path).
 def notify_results(findings, applied):
     """Print summary and save applied results."""
     if not findings:
@@ -487,19 +493,25 @@ def run(hours=24):
     stats = get_stats()
     print(f"Index: +{new_msgs} messages. Total: {stats['sessions']} sessions, {stats['messages']} messages.")
 
-    # Step 2: Find recent sessions not yet analyzed
+    # Step 2: Find sessions since last run
     state = load_state()
-    analyzed = set(state.get("analyzed_sessions", []))
+    last_run = state.get("last_run")
 
-    recent = recent_sessions(hours=hours, min_messages=5)
-    to_analyze = [s for s in recent if s["session_id"] not in analyzed]
+    if last_run:
+        # Convert last_run ISO timestamp to hours-ago for recent_sessions query
+        last_run_dt = datetime.fromisoformat(last_run)
+        delta = datetime.now(timezone.utc) - last_run_dt
+        hours_since = max(1, int(delta.total_seconds() / 3600) + 1)
+        recent = recent_sessions(hours=hours_since, min_messages=5)
+        # Filter to only sessions started after last_run
+        to_analyze = [s for s in recent if s["started_at"] > last_run]
+    else:
+        recent = recent_sessions(hours=hours, min_messages=5)
+        to_analyze = recent
 
     if not to_analyze:
         print("No new sessions to analyze.")
-        save_state({
-            "last_run": datetime.now(timezone.utc).isoformat(),
-            "analyzed_sessions": list(analyzed)
-        })
+        save_state({"last_run": datetime.now(timezone.utc).isoformat()})
         return
 
     print(f"Found {len(to_analyze)} sessions to analyze...")
@@ -531,23 +543,43 @@ def run(hours=24):
 
     print(f"Found {len(findings)} learnings.")
 
-    # Step 5: Apply findings automatically
-    applied = apply_findings(findings)
+    # Step 5: Save findings to pending_learnings.json for human review
+    if findings:
+        existing_pending = []
+        if PENDING_FILE.exists():
+            try:
+                with open(PENDING_FILE) as f:
+                    existing_pending = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                existing_pending = []
 
-    # Step 6: Log and notify
-    log_analysis(findings, session_ids)
-    notify_results(findings, applied)
+        existing_pending.extend(findings)
+        PENDING_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(PENDING_FILE, "w") as f:
+            json.dump(existing_pending, f, indent=2)
+
+        # Step 6: Log and notify
+        log_analysis(findings, session_ids)
+        print(f"Saved {len(findings)} findings to pending_learnings.json.")
+        print(f"Run /learn in Claude Code to review and apply.")
 
     # Step 7: Update state
-    analyzed.update(session_ids)
-    # Keep only last 200 session IDs to avoid state file bloat
-    analyzed_list = sorted(analyzed)[-200:]
-    save_state({
-        "last_run": datetime.now(timezone.utc).isoformat(),
-        "analyzed_sessions": analyzed_list
-    })
+    save_state({"last_run": datetime.now(timezone.utc).isoformat()})
 
 
 if __name__ == "__main__":
-    hours = int(sys.argv[1]) if len(sys.argv) > 1 else 24
-    run(hours=hours)
+    if len(sys.argv) > 1 and sys.argv[1] == "--apply-json":
+        if len(sys.argv) < 3:
+            print("Usage: analyzer.py --apply-json '<json_string>'")
+            sys.exit(1)
+        try:
+            candidate = json.loads(sys.argv[2])
+        except json.JSONDecodeError as e:
+            print(f"Invalid JSON argument: {e}")
+            sys.exit(1)
+        applied = apply_findings([candidate])
+        print(f"Applied: {applied}")
+        sys.exit(0 if sum(applied.values()) > 0 else 1)
+    else:
+        hours = int(sys.argv[1]) if len(sys.argv) > 1 else 24
+        run(hours=hours)

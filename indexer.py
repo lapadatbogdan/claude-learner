@@ -66,6 +66,22 @@ def init_db():
     """)
 
     c.execute("""
+        CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
+            INSERT INTO messages_fts(messages_fts, rowid, session_id, content, tools_used)
+            VALUES('delete', old.id, old.session_id, old.content, old.tools_used);
+        END
+    """)
+
+    c.execute("""
+        CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
+            INSERT INTO messages_fts(messages_fts, rowid, session_id, content, tools_used)
+            VALUES('delete', old.id, old.session_id, old.content, old.tools_used);
+            INSERT INTO messages_fts(rowid, session_id, content, tools_used)
+            VALUES(new.id, new.session_id, new.content, new.tools_used);
+        END
+    """)
+
+    c.execute("""
         CREATE TABLE IF NOT EXISTS index_state (
             file_path TEXT PRIMARY KEY,
             last_size INTEGER,
@@ -235,6 +251,18 @@ def index_all():
                 total_new += new_msgs
         except Exception as e:
             print(f"Error indexing {jsonl_file}: {e}")
+
+    # Find all JSONL files in sessions dir
+    if SESSIONS_DIR.exists():
+        for jsonl_file in glob.glob(str(SESSIONS_DIR / "*.jsonl")):
+            if os.path.getsize(jsonl_file) < 100:
+                continue
+            try:
+                new_msgs = index_session_file(conn, jsonl_file)
+                if new_msgs > 0:
+                    total_new += new_msgs
+            except Exception as e:
+                print(f"Error indexing {jsonl_file}: {e}")
 
     conn.close()
     return total_new

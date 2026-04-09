@@ -11,6 +11,9 @@ DB_PATH = Path.home() / "tools" / "claude-learner" / "sessions.db"
 
 def search(query, limit=10):
     """Full-text search across all indexed sessions."""
+    if not DB_PATH.exists():
+        print("No session index found. Run indexer.py first.")
+        return []
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
@@ -83,6 +86,8 @@ def search_sessions(query, limit=5):
 
 def recent_sessions(hours=24, min_messages=3):
     """Get recent sessions with enough activity."""
+    if not DB_PATH.exists():
+        return []
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
@@ -110,6 +115,8 @@ def recent_sessions(hours=24, min_messages=3):
 
 def get_session_transcript(session_id, max_messages=50):
     """Get full transcript of a session."""
+    if not DB_PATH.exists():
+        return []
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
